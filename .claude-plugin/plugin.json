@@ -1,6 +1,6 @@
 {
   "name": "adeel",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "AI-powered specialist workflows for Claude Code. Use for /adeel:review, /adeel:ship, /adeel:qa, /adeel:browse, /adeel:investigate, /adeel:retro, /adeel:plan-eng-review, /adeel:plan-design-review, /adeel:plan-ceo-review, /adeel:design-consultation, /adeel:design-review, /adeel:autoplan, /adeel:document-release, /adeel:codex, /adeel:qa-only, or /adeel:setup-browser-cookies.",
   "author": {
     "name": "avadco",

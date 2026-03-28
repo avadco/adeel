@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
-# adeel-update-check — report marketplace autoUpdate status for SessionStart.
+# adeel-update-check — check and enable autoUpdate on first run.
+#
+# First run: enables autoUpdate in settings.json + known_marketplaces.json, creates marker.
+# Subsequent runs: reads only, outputs status to stdout for context.
 set -euo pipefail
 
+MARKETPLACE_ID="avadco-adeel"
 SETTINGS_FILE="$HOME/.claude/settings.json"
 KNOWN_FILE="$HOME/.claude/plugins/known_marketplaces.json"
-MARKETPLACE_ID="avadco-adeel"
+STATE_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.adeel}"
+OUT_FILE="$STATE_DIR/adeel-update.json"
+MARKER="$STATE_DIR/.auto-update-done"
 
-JSON_TOOL=""
+mkdir -p "$STATE_DIR"
+
 if command -v jq >/dev/null 2>&1; then
   JSON_TOOL="jq"
 elif command -v python3 >/dev/null 2>&1; then
@@ -15,6 +22,10 @@ elif command -v python >/dev/null 2>&1; then
   JSON_TOOL="python"
 elif command -v node >/dev/null 2>&1; then
   JSON_TOOL="node"
+else
+  echo '{"autoUpdate":false}' > "$OUT_FILE"
+  echo "ADEEL_AUTO_UPDATE=false"
+  exit 0
 fi
 
 json_read() {
@@ -45,26 +56,76 @@ try {
 } catch(e) { console.log("null"); }
 ' 2>/dev/null || echo "null"
       ;;
-    *)
-      echo "null"
+  esac
+}
+
+json_set() {
+  local file="$1" key_path="$2" value="$3"
+  local tmp="${file}.tmp.$$"
+  case "$JSON_TOOL" in
+    jq)
+      if jq "$key_path = $value" "$file" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$file"; return 0
+      fi
+      rm -f "$tmp"; return 1
+      ;;
+    python3|python)
+      _JS_FILE="$file" _JS_KEY="$key_path" _JS_VAL="$value" _JS_TMP="$tmp" \
+      "$JSON_TOOL" -c '
+import json, os
+f = os.environ["_JS_FILE"]
+with open(f) as fh: d = json.load(fh)
+keys = os.environ["_JS_KEY"].lstrip(".").replace(chr(34),"").split(".")
+obj = d
+for k in keys[:-1]:
+    if k not in obj or not isinstance(obj[k], dict):
+        obj[k] = {}
+    obj = obj[k]
+obj[keys[-1]] = json.loads(os.environ["_JS_VAL"])
+with open(os.environ["_JS_TMP"],"w") as fh: json.dump(d, fh, indent=2)
+' 2>/dev/null && mv "$tmp" "$file" && return 0
+      rm -f "$tmp"; return 1
+      ;;
+    node)
+      _JS_FILE="$file" _JS_KEY="$key_path" _JS_VAL="$value" _JS_TMP="$tmp" \
+      node -e '
+const fs = require("fs");
+let d = JSON.parse(fs.readFileSync(process.env._JS_FILE,"utf8"));
+const keys = process.env._JS_KEY.replace(/^\./,"").replace(/"/g,"").split(".");
+let obj = d;
+for (let i = 0; i < keys.length - 1; i++) {
+  if (!obj[keys[i]] || typeof obj[keys[i]] !== "object") obj[keys[i]] = {};
+  obj = obj[keys[i]];
+}
+obj[keys[keys.length-1]] = JSON.parse(process.env._JS_VAL);
+fs.writeFileSync(process.env._JS_TMP, JSON.stringify(d, null, 2));
+' 2>/dev/null && mv "$tmp" "$file" && return 0
+      rm -f "$tmp"; return 1
       ;;
   esac
 }
 
-ok="false"
-if [[ -n "$JSON_TOOL" ]]; then
-  ok="true"
-  if [ -f "$SETTINGS_FILE" ]; then
-    val="$(json_read "$SETTINGS_FILE" ".extraKnownMarketplaces.\"$MARKETPLACE_ID\".autoUpdate")"
-    [ "$val" != "true" ] && ok="false"
-  else
-    ok="false"
-  fi
-
-  if [ "$ok" = "true" ] && [ -f "$KNOWN_FILE" ]; then
-    val="$(json_read "$KNOWN_FILE" ".\"$MARKETPLACE_ID\".autoUpdate")"
-    [ "$val" != "true" ] && ok="false"
-  fi
+if [ ! -f "$MARKER" ]; then
+  [ -f "$SETTINGS_FILE" ] && json_set "$SETTINGS_FILE" \
+    ".extraKnownMarketplaces.\"$MARKETPLACE_ID\".autoUpdate" "true" 2>/dev/null || true
+  [ -f "$KNOWN_FILE" ] && json_set "$KNOWN_FILE" \
+    ".\"$MARKETPLACE_ID\".autoUpdate" "true" 2>/dev/null || true
+  touch "$MARKER"
 fi
 
+ok="true"
+
+if [ -f "$SETTINGS_FILE" ]; then
+  val="$(json_read "$SETTINGS_FILE" ".extraKnownMarketplaces.\"$MARKETPLACE_ID\".autoUpdate")"
+  [ "$val" != "true" ] && ok="false"
+else
+  ok="false"
+fi
+
+if [ "$ok" = "true" ] && [ -f "$KNOWN_FILE" ]; then
+  val="$(json_read "$KNOWN_FILE" ".\"$MARKETPLACE_ID\".autoUpdate")"
+  [ "$val" != "true" ] && ok="false"
+fi
+
+echo "{\"autoUpdate\":$ok}" > "$OUT_FILE"
 echo "ADEEL_AUTO_UPDATE=$ok"
