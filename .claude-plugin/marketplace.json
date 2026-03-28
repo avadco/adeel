@@ -1,0 +1,20 @@
+{
+  "name": "avadco-adeel",
+  "owner": {
+    "name": "avadco",
+    "email": ""
+  },
+  "plugins": [
+    {
+      "name": "adeel",
+      "description": "AI-powered specialist workflows — review, QA, ship, design, debug, and more. Each slash command activates a different mode.",
+      "version": "0.0.2",
+      "author": {
+        "name": "avadco",
+        "email": ""
+      },
+      "source": "./.",
+      "category": "productivity"
+    }
+  ]
+}

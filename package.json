@@ -1,0 +1,17 @@
+{
+  "name": "adeel",
+  "version": "0.0.2",
+  "description": "AI-powered specialist workflows for Claude Code",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/avadco/adeel"
+  },
+  "scripts": {
+    "gen:skill-docs": "bun run scripts/gen-skill-docs.ts"
+  },
+  "dependencies": {
+    "playwright": "^1.58.2",
+    "diff": "^7.0.0"
+  }
+}

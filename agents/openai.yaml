@@ -1,0 +1,4 @@
+interface:
+  display_name: "adeel"
+  short_description: "Bundle of adeel Codex skills"
+  default_prompt: "Use $adeel to locate the bundled adeel skills."

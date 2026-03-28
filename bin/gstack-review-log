@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# adeel-review-log — atomically log a review result
+# Usage: adeel-review-log '{"skill":"...","timestamp":"...","status":"..."}'
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+eval "$("$SCRIPT_DIR/adeel-slug" 2>/dev/null)"
+ADEEL_HOME="${ADEEL_HOME:-$HOME/.adeel}"
+mkdir -p "$ADEEL_HOME/projects/$SLUG"
+
+# Validate: input must be parseable JSON (reject malformed or injection attempts)
+INPUT="$1"
+if ! printf '%s' "$INPUT" | bun -e "JSON.parse(await Bun.stdin.text())" 2>/dev/null; then
+  # Not valid JSON — refuse to append
+  echo "adeel-review-log: invalid JSON, skipping" >&2
+  exit 1
+fi
+
+echo "$INPUT" >> "$ADEEL_HOME/projects/$SLUG/$BRANCH-reviews.jsonl"
