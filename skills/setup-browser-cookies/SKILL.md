@@ -3,6 +3,7 @@ name: setup-browser-cookies
 preamble-tier: 1
 version: 1.0.0
 description: |
+  MANUAL TRIGGER ONLY: invoke only when user types /setup-browser-cookies.
   Import cookies from your real Chromium browser into the headless browse session.
   Opens an interactive picker UI where you select which cookie domains to import.
   Use before QA testing authenticated pages. Use when asked to "import cookies",
@@ -15,24 +16,26 @@ allowed-tools:
 <!-- AUTO-GENERATED from SKILL.md.tmpl — do not edit directly -->
 <!-- Regenerate: bun run gen:skill-docs -->
 
+## Pre-check
+
+Check the SessionStart hook output in this conversation context for `ADEEL_AUTO_UPDATE=`.
+If it says `ADEEL_AUTO_UPDATE=false`, use AskUserQuestion to ask:
+"Auto-updates are off. Run /adeel-update to enable?" If yes, invoke
+`/adeel-update`. If `ADEEL_AUTO_UPDATE=true` or not found, proceed directly
+without mentioning it.
+
 ## Preamble (run first)
 
 ```bash
-_UPD=$(${CLAUDE_PLUGIN_ROOT}/bin/adeel-update-check 2>/dev/null || ${CLAUDE_PLUGIN_ROOT}/bin/adeel-update-check 2>/dev/null || true)
-[ -n "$_UPD" ] && echo "$_UPD" || true
 mkdir -p $HOME/.adeel/sessions
 touch $HOME/.adeel/sessions/"$PPID"
 _SESSIONS=$(find $HOME/.adeel/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d ' ')
 find $HOME/.adeel/sessions -mmin +120 -type f -delete 2>/dev/null || true
 _CONTRIB=$(${CLAUDE_PLUGIN_ROOT}/bin/adeel-config get adeel_contributor 2>/dev/null || true)
 _PROACTIVE=$(${CLAUDE_PLUGIN_ROOT}/bin/adeel-config get proactive 2>/dev/null || echo "true")
-_PROACTIVE_PROMPTED=$([ -f $HOME/.adeel/.proactive-prompted ] && echo "yes" || echo "no")
 _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
-_SKILL_PREFIX=$(${CLAUDE_PLUGIN_ROOT}/bin/adeel-config get skill_prefix 2>/dev/null || echo "false")
 echo "PROACTIVE: $_PROACTIVE"
-echo "PROACTIVE_PROMPTED: $_PROACTIVE_PROMPTED"
-echo "SKILL_PREFIX: $_SKILL_PREFIX"
 source <(${CLAUDE_PLUGIN_ROOT}/bin/adeel-repo-mode 2>/dev/null) || true
 REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
@@ -46,27 +49,10 @@ echo "TEL_PROMPTED: $_TEL_PROMPTED"
 mkdir -p $HOME/.adeel/analytics
 echo '{"skill":"setup-browser-cookies","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","repo":"'$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")'"}'  >> $HOME/.adeel/analytics/skill-usage.jsonl 2>/dev/null || true
 # zsh-compatible: use find instead of glob to avoid NOMATCH error
-for _PF in $(find $HOME/.adeel/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do
-  if [ -f "$_PF" ]; then
-    fi
-    rm -f "$_PF" 2>/dev/null || true
-  fi
-  break
-done
 ```
 
-If `PROACTIVE` is `"false"`, do not proactively suggest adeel skills AND do not
-auto-invoke skills based on conversation context. Only run skills the user explicitly
-types (e.g., /adeel:qa, /adeel:ship). If you would have auto-invoked a skill, instead briefly say:
-"I think /skillname might help here — want me to run it?" and wait for confirmation.
-The user opted out of proactive behavior.
-
-If `SKILL_PREFIX` is `"true"`, the user has namespaced skill names. When suggesting
-or invoking other adeel skills, use the `/adeel-` prefix (e.g., `/adeel-qa` instead
-of `/adeel:qa`, `/adeel-ship` instead of `/adeel:ship`). Disk paths are unaffected — always use
-`${CLAUDE_PLUGIN_ROOT}/[skill-name]/SKILL.md` for reading skill files.
-
-If output shows `UPGRADE_AVAILABLE <old> <new>`: read `${CLAUDE_PLUGIN_ROOT}/adeel-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running adeel v{to} (just updated!)" and continue.
+If `PROACTIVE` is `"false"`, do not proactively suggest adeel skills — only invoke
+them when the user explicitly asks. The user opted out of proactive suggestions.
 
 If `LAKE_INTRO` is `no`: Before continuing, introduce the Completeness Principle.
 Tell the user: "adeel follows the **Go all the way** principle — always do the complete
@@ -109,33 +95,6 @@ touch $HOME/.adeel/.telemetry-prompted
 ```
 
 This only happens once. If `TEL_PROMPTED` is `yes`, skip this entirely.
-
-If `PROACTIVE_PROMPTED` is `no` AND `TEL_PROMPTED` is `yes`: After telemetry is handled,
-ask the user about proactive behavior. Use AskUserQuestion:
-
-> adeel can proactively figure out when you might need a skill while you work —
-> like suggesting /adeel:qa when you say "does this work?" or /adeel:investigate when you hit
-> a bug. We recommend keeping this on — it speeds up every part of your workflow.
-
-Options:
-- A) Keep it on (recommended)
-- B) Turn it off — I'll type /commands myself
-
-If A: run `${CLAUDE_PLUGIN_ROOT}/bin/adeel-config set proactive true`
-If B: run `${CLAUDE_PLUGIN_ROOT}/bin/adeel-config set proactive false`
-
-Always run:
-```bash
-touch $HOME/.adeel/.proactive-prompted
-```
-
-This only happens once. If `PROACTIVE_PROMPTED` is `yes`, skip this entirely.
-
-## Voice
-
-**Tone:** direct, concrete, sharp, never corporate, never academic. Sound like a builder, not a consultant. Name the file, the function, the command. No filler, no throat-clearing.
-
-**Writing rules:** No em dashes (use commas, periods, "..."). No AI vocabulary (delve, crucial, robust, comprehensive, nuanced, etc.). Short paragraphs. End with what to do.
 
 ## Contributor Mode
 
@@ -198,18 +157,14 @@ Run this bash:
 _TEL_END=$(date +%s)
 _TEL_DUR=$(( _TEL_END - _TEL_START ))
 rm -f $HOME/.adeel/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
-# Local analytics (always available, no binary needed)
-echo '{"skill":"SKILL_NAME","duration_s":"'"$_TEL_DUR"'","outcome":"OUTCOME","browse":"USED_BROWSE","session":"'"$_SESSION_ID"'","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' >> $HOME/.adeel/analytics/skill-usage.jsonl 2>/dev/null || true
-# Remote telemetry (opt-in, requires binary)
-    --skill "SKILL_NAME" --duration "$_TEL_DUR" --outcome "OUTCOME" \
-    --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
-fi
+  --skill "SKILL_NAME" --duration "$_TEL_DUR" --outcome "OUTCOME" \
+  --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
 ```
 
 Replace `SKILL_NAME` with the actual skill name from frontmatter, `OUTCOME` with
 success/error/abort, and `USED_BROWSE` with true/false based on whether `$B` was used.
-If you cannot determine the outcome, use "unknown". The local JSONL always logs. The
-remote binary only runs if telemetry is not off and the binary exists.
+If you cannot determine the outcome, use "unknown". This runs in the background and
+never blocks the user.
 
 ## Plan Status Footer
 
@@ -275,7 +230,7 @@ If `CDP_MODE=true`: tell the user "Not needed — you're connected to your real 
 ```bash
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 B=""
-[ -n "$_ROOT" ] && [ -x "$_ROOT/${CLAUDE_PLUGIN_ROOT}/browse/dist/browse" ] && B="$_ROOT/${CLAUDE_PLUGIN_ROOT}/browse/dist/browse"
+[ -n "$_ROOT" ] && [ -x "$_ROOT/.claude/skills/adeel/browse/dist/browse" ] && B="$_ROOT/.claude/skills/adeel/browse/dist/browse"
 [ -z "$B" ] && B=${CLAUDE_PLUGIN_ROOT}/browse/dist/browse
 if [ -x "$B" ]; then
   echo "READY: $B"
@@ -287,12 +242,7 @@ fi
 If `NEEDS_SETUP`:
 1. Tell the user: "adeel browse needs a one-time build (~10 seconds). OK to proceed?" Then STOP and wait.
 2. Run: `cd <SKILL_DIR> && ./setup`
-3. If `bun` is not installed:
-   ```bash
-   if ! command -v bun >/dev/null 2>&1; then
-     curl -fsSL https://bun.sh/install | BUN_VERSION=1.3.10 bash
-   fi
-   ```
+3. If `bun` is not installed: `curl -fsSL https://bun.sh/install | bash`
 
 ### 2. Open the cookie picker
 

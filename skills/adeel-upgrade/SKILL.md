@@ -2,6 +2,7 @@
 name: adeel-upgrade
 version: 1.1.0
 description: |
+  MANUAL TRIGGER ONLY: invoke only when user types /adeel-upgrade.
   Upgrade adeel to the latest version. Detects global vs vendored install,
   runs the upgrade, and shows what's new. Use when asked to "upgrade adeel",
   "update adeel", or "get latest version".

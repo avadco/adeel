@@ -142,7 +142,12 @@ function processTemplate(tmplPath: string, host: Host = 'claude'): { outputPath:
 // ─── Main ───────────────────────────────────────────────────
 
 function findTemplates(): string[] {
-  return discoverTemplates(SKILLS_ROOT).map(t => path.join(SKILLS_ROOT, t.tmpl));
+  const templates = discoverTemplates(SKILLS_ROOT).map(t => path.join(SKILLS_ROOT, t.tmpl));
+  const rootTemplate = path.join(ROOT, 'SKILL.md.tmpl');
+  if (fs.existsSync(rootTemplate)) {
+    templates.push(rootTemplate);
+  }
+  return templates;
 }
 
 let hasChanges = false;
